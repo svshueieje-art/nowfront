@@ -165,9 +165,9 @@ export function AppLayout() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-surface-200 truncate">
-                {user?.fullName || user?.phoneNumber || 'User'}
+                {user?.fullName || user?.phone || 'User'}
               </p>
-              <p className="text-xs text-surface-500 truncate">{user?.phoneNumber}</p>
+              <p className="text-xs text-surface-500 truncate">{user?.phone}</p>
             </div>
           </div>
           <button

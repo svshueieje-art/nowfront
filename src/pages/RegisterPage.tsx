@@ -52,9 +52,8 @@ export function RegisterPage() {
     setIsLoading(true);
     try {
       await register({
-        phoneNumber: phoneNumber.trim(),
+        phone: phoneNumber.trim(),
         password,
-        confirmPassword,
         referralCode: referralCode.trim() || undefined,
       });
       addToast({

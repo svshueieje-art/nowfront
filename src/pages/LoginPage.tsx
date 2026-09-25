@@ -40,7 +40,7 @@ export function LoginPage() {
 
     setIsLoading(true);
     try {
-      await login({ phoneNumber: phoneNumber.trim(), password });
+      await login({ phone: phoneNumber.trim(), password });
       addToast({ type: 'success', title: 'Welcome back!' });
       navigate(from, { replace: true });
     } catch (err) {

@@ -4,7 +4,6 @@
 
 import { apiClient } from './client';
 import type {
-  AuthResponse,
   LoginRequest,
   RegisterRequest,
   User,
@@ -33,14 +32,14 @@ import type {
 
 // ---- Auth ----
 export const authApi = {
-  register: async (data: RegisterRequest): Promise<AuthResponse> => {
-    const res = await apiClient.post<AuthResponse>('/auth/register', data);
-    return res.data;
+  register: async (data: RegisterRequest): Promise<User> => {
+    const res = await apiClient.post<{ success: boolean; data: User }>('/auth/register', data);
+    return res.data.data;
   },
 
-  login: async (data: LoginRequest): Promise<AuthResponse> => {
-    const res = await apiClient.post<AuthResponse>('/auth/login', data);
-    return res.data;
+  login: async (data: LoginRequest): Promise<User> => {
+    const res = await apiClient.post<{ success: boolean; data: User }>('/auth/login', data);
+    return res.data.data;
   },
 
   logout: async (): Promise<void> => {
@@ -48,8 +47,8 @@ export const authApi = {
   },
 
   getMe: async (): Promise<User> => {
-    const res = await apiClient.get<{ user: User }>('/auth/me');
-    return res.data.user;
+    const res = await apiClient.get<{ success: boolean; data: User }>('/auth/me');
+    return res.data.data;
   },
 };
 

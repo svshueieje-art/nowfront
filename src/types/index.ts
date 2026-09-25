@@ -5,25 +5,32 @@
 // ---- User ----
 export interface User {
   id: string;
-  phoneNumber: string;
+  phone: string;
   fullName?: string;
   referralCode: string;
-  registrationBonusStatus: 'locked' | 'unlocked' | 'claimed';
-  registrationBonusAmount: number;
+  bonusStatus: 'locked' | 'unlocked' | 'claimed';
+  isActive: boolean;
   createdAt: string;
-  updatedAt: string;
+  wallet?: {
+    availableBalance: string;
+    lockedBalance: string;
+  } | null;
+  stats?: {
+    totalReferrals: number;
+    totalPurchases: number;
+  };
 }
 
 // ---- Auth ----
 export interface LoginRequest {
-  phoneNumber: string;
+  phone: string;
   password: string;
 }
 
 export interface RegisterRequest {
-  phoneNumber: string;
+  phone: string;
   password: string;
-  confirmPassword: string;
+  fullName?: string;
   referralCode?: string;
 }
 

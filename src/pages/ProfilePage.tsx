@@ -119,7 +119,7 @@ export function ProfilePage() {
             <h2 className="text-lg font-bold text-surface-100">
               {user.fullName || 'Customer'}
             </h2>
-            <p className="text-sm text-surface-400">{user.phoneNumber}</p>
+            <p className="text-sm text-surface-400">{user.phone}</p>
           </div>
         </div>
 
@@ -128,7 +128,7 @@ export function ProfilePage() {
             <Phone className="h-4 w-4 text-surface-500" />
             <div>
               <p className="text-xs text-surface-500">Phone Number</p>
-              <p className="text-sm text-surface-200">{user.phoneNumber}</p>
+              <p className="text-sm text-surface-200">{user.phone}</p>
             </div>
           </div>
 
@@ -157,7 +157,7 @@ export function ProfilePage() {
               <p className="text-xs text-surface-500">Registration Bonus</p>
               <p className="text-sm text-surface-200">100 ETB</p>
             </div>
-            <StatusBadge status={user.registrationBonusStatus} />
+            <StatusBadge status={user.bonusStatus} />
           </div>
 
           {user.createdAt && (
