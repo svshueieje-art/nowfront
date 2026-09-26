@@ -1,10 +1,10 @@
 // ========================================
-// Transaction History Page
+// Transaction History Page — uses /wallet/transactions
 // ========================================
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { transactionsApi } from '@/api';
+import { walletApi } from '@/api';
 import {
   Card,
   PageHeader,
@@ -12,7 +12,6 @@ import {
   EmptyState,
   ListSkeleton,
   Alert,
-  StatusBadge,
   Select,
 } from '@/components/ui';
 import { CurrencyDisplay } from '@/components/ui';
@@ -26,20 +25,18 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
 } from 'lucide-react';
-import type { TransactionType } from '@/types';
 
 const typeOptions = [
   { value: '', label: 'All Types' },
-  { value: 'registration_bonus', label: 'Registration Bonus' },
-  { value: 'coffee_purchase', label: 'Coffee Purchase' },
-  { value: 'daily_income', label: 'Daily Income' },
-  { value: 'referral_commission', label: 'Referral Commission' },
-  { value: 'promo_reward', label: 'Promo Reward' },
-  { value: 'withdrawal_hold', label: 'Withdrawal Hold' },
-  { value: 'withdrawal_completed', label: 'Withdrawal' },
-  { value: 'withdrawal_refund', label: 'Withdrawal Refund' },
-  { value: 'admin_adjustment', label: 'Adjustment' },
-  { value: 'refund', label: 'Refund' },
+  { value: 'REGISTRATION_BONUS', label: 'Registration Bonus' },
+  { value: 'PURCHASE', label: 'Purchase' },
+  { value: 'DAILY_CLAIM', label: 'Daily Income' },
+  { value: 'REFERRAL_COMMISSION', label: 'Referral Commission' },
+  { value: 'REWARD_CODE', label: 'Reward Code' },
+  { value: 'WITHDRAWAL', label: 'Withdrawal' },
+  { value: 'WITHDRAWAL_REVERSAL', label: 'Withdrawal Reversal' },
+  { value: 'ADMIN_CREDIT', label: 'Admin Credit' },
+  { value: 'ADMIN_DEBIT', label: 'Admin Debit' },
 ];
 
 export function TransactionsPage() {
@@ -48,12 +45,12 @@ export function TransactionsPage() {
   const limit = 20;
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['transactions', { page, limit, type: typeFilter || undefined }],
+    queryKey: ['wallet', 'transactions', { page, limit, type: typeFilter || undefined }],
     queryFn: () =>
-      transactionsApi.getTransactions({
+      walletApi.getTransactions({
         page,
         limit,
-        type: (typeFilter as TransactionType) || undefined,
+        type: typeFilter || undefined,
       }),
     staleTime: 15000,
   });
@@ -71,20 +68,19 @@ export function TransactionsPage() {
             setTypeFilter(e.target.value);
             setPage(1);
           }}
-          placeholder="Filter by type"
         />
       </div>
 
-      {/* Transactions List */}
+      {/* Content */}
       {isLoading ? (
-        <ListSkeleton rows={10} />
+        <ListSkeleton rows={8} />
       ) : error ? (
         <Alert variant="error">Failed to load transactions.</Alert>
       ) : !data?.data.length ? (
         <EmptyState
-          icon={<ArrowDownUp className="h-12 w-12" />}
-          title="No transactions yet"
-          description="Your transaction history will appear here once you start using the platform."
+          icon={<ArrowDownUp className="h-10 w-10" />}
+          title="No transactions found"
+          description={typeFilter ? 'Try changing the filter.' : 'Your transaction history will appear here.'}
         />
       ) : (
         <>
@@ -95,7 +91,7 @@ export function TransactionsPage() {
                 <Card key={tx.id} variant="bordered" padding="sm">
                   <div className="flex items-center gap-3">
                     <div
-                      className={`h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                      className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
                         positive ? 'bg-success-500/10' : 'bg-danger-500/10'
                       }`}
                     >
@@ -106,33 +102,23 @@ export function TransactionsPage() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-surface-200 truncate">
-                          {getTransactionTypeLabel(tx.type)}
-                        </p>
-                        {tx.status !== 'completed' && <StatusBadge status={tx.status} />}
-                      </div>
-                      <p className="text-xs text-surface-500 mt-0.5">
+                      <p className="text-sm font-medium text-surface-200 truncate">
+                        {getTransactionTypeLabel(tx.type)}
+                      </p>
+                      <p className="text-xs text-surface-500">
                         {formatDateTime(tx.createdAt)}
                       </p>
                       {tx.description && (
-                        <p className="text-xs text-surface-500 mt-0.5 truncate">
-                          {tx.description}
-                        </p>
+                        <p className="text-xs text-surface-500 truncate">{tx.description}</p>
                       )}
                     </div>
                     <div className="text-right flex-shrink-0">
                       <CurrencyDisplay
-                        amount={tx.amount}
+                        amount={parseFloat(tx.amount)}
                         size="sm"
                         positive={positive}
                         negative={!positive}
                       />
-                      {tx.reference && (
-                        <p className="text-[10px] text-surface-600 mt-0.5">
-                          Ref: {tx.reference}
-                        </p>
-                      )}
                     </div>
                   </div>
                 </Card>
@@ -140,12 +126,11 @@ export function TransactionsPage() {
             })}
           </div>
 
-          {data.pagination.totalPages > 1 && (
+          {data.pagination && data.pagination.totalPages > 1 && (
             <Pagination
               currentPage={data.pagination.page}
               totalPages={data.pagination.totalPages}
               onPageChange={setPage}
-              isLoading={isLoading}
             />
           )}
         </>

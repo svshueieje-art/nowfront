@@ -1,12 +1,12 @@
 // ========================================
-// Dashboard Page
+// Dashboard Page — built from /auth/me + /claims/eligible
 // ========================================
 
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { dashboardApi } from '@/api';
-import { Card, StatSkeleton, PageHeader } from '@/components/ui';
-import { CurrencyDisplay } from '@/components/ui';
+import { claimsApi, notificationsApi } from '@/api';
+import { useAuth } from '@/hooks/useAuth';
+import { Card, StatSkeleton, PageHeader, Alert, Button, CurrencyDisplay } from '@/components/ui';
 import { formatCurrency } from '@/lib/utils';
 import {
   Wallet,
@@ -18,54 +18,38 @@ import {
   ArrowRight,
   Lock,
   TrendingUp,
-  CheckCircle2,
   Clock,
 } from 'lucide-react';
-import { Alert, Button } from '@/components/ui';
-import { clsx } from 'clsx';
 
 export function DashboardPage() {
-  const {
-    data: dashboard,
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: ['dashboard'],
-    queryFn: dashboardApi.getDashboard,
-    refetchInterval: 60000,
+  const { user } = useAuth();
+
+  const { data: eligibleClaims, isLoading: claimsLoading } = useQuery({
+    queryKey: ['claims', 'eligible'],
+    queryFn: claimsApi.getEligibleClaims,
     staleTime: 30000,
   });
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6 animate-fade-in">
-        <PageHeader title="Dashboard" />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatSkeleton />
-          <StatSkeleton />
-          <StatSkeleton />
-          <StatSkeleton />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <StatSkeleton />
-          <StatSkeleton />
-        </div>
-      </div>
-    );
-  }
+  const { data: unreadCount } = useQuery({
+    queryKey: ['notifications', 'unread-count'],
+    queryFn: notificationsApi.getUnreadCount,
+    staleTime: 30000,
+  });
 
-  if (error || !dashboard) {
+  if (!user) {
     return (
       <div className="space-y-6">
         <PageHeader title="Dashboard" />
-        <Alert variant="error">
-          Failed to load dashboard data. Please try refreshing the page.
-        </Alert>
+        <Alert variant="error">Failed to load dashboard data. Please try refreshing the page.</Alert>
       </div>
     );
   }
 
-  const { wallet, dailyIncome, packageSummary, referralSummary, pendingWithdrawalAmount, unreadNotifications } = dashboard;
+  const availableBalance = user.wallet?.availableBalance || '0.00';
+  const lockedBalance = user.wallet?.lockedBalance || '0.00';
+  const totalReferrals = user.stats?.totalReferrals || 0;
+  const totalPurchases = user.stats?.totalPurchases || 0;
+  const hasEligibleClaims = eligibleClaims && eligibleClaims.length > 0;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -79,17 +63,12 @@ export function DashboardPage() {
             <Wallet className="h-4 w-4" />
             <span className="text-sm font-medium">Available Balance</span>
           </div>
-          <CurrencyDisplay amount={wallet.availableBalance} size="xl" />
+          <CurrencyDisplay amount={parseFloat(availableBalance)} size="xl" />
           <div className="flex flex-wrap gap-4 mt-4 text-sm">
             <div className="flex items-center gap-1.5">
               <Lock className="h-3.5 w-3.5 text-surface-500" />
-              <span className="text-surface-400">Locked Bonus:</span>
-              <span className="text-surface-300">{formatCurrency(wallet.lockedBonus)}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <TrendingUp className="h-3.5 w-3.5 text-success-500" />
-              <span className="text-surface-400">Total Earned:</span>
-              <span className="text-success-500">{formatCurrency(wallet.totalEarned)}</span>
+              <span className="text-surface-400">Locked:</span>
+              <span className="text-surface-300">{formatCurrency(parseFloat(lockedBalance))}</span>
             </div>
           </div>
           <div className="flex gap-2 mt-5">
@@ -116,38 +95,38 @@ export function DashboardPage() {
               <Sun className="h-4 w-4 text-warning-500" />
               <span className="text-xs font-medium">Daily Income</span>
             </div>
-            <p className="text-lg font-bold text-surface-100">
-              {formatCurrency(dailyIncome.totalClaimableToday)}
-            </p>
-            <div className="mt-1.5">
-              {dailyIncome.todayClaimed ? (
-                <span className="inline-flex items-center gap-1 text-xs text-success-500">
-                  <CheckCircle2 className="h-3 w-3" /> Claimed
-                </span>
-              ) : dailyIncome.canClaim ? (
-                <span className="inline-flex items-center gap-1 text-xs text-warning-500 animate-pulse">
-                  <Clock className="h-3 w-3" /> Available
-                </span>
-              ) : (
-                <span className="text-xs text-surface-500">No claims</span>
-              )}
-            </div>
+            {claimsLoading ? (
+              <StatSkeleton />
+            ) : (
+              <>
+                <p className="text-lg font-bold text-surface-100">
+                  {eligibleClaims?.length || 0} packages
+                </p>
+                <div className="mt-1.5">
+                  {hasEligibleClaims ? (
+                    <span className="inline-flex items-center gap-1 text-xs text-warning-500 animate-pulse">
+                      <Clock className="h-3 w-3" /> Claims available
+                    </span>
+                  ) : (
+                    <span className="text-xs text-surface-500">No claims</span>
+                  )}
+                </div>
+              </>
+            )}
           </Card>
         </Link>
 
-        {/* Active Packages */}
+        {/* Packages */}
         <Link to="/packages">
           <Card hoverable className="h-full">
             <div className="flex items-center gap-2 text-surface-400 mb-2">
               <Coffee className="h-4 w-4 text-brand-500" />
-              <span className="text-xs font-medium">Packages</span>
+              <span className="text-xs font-medium">Purchases</span>
             </div>
             <p className="text-lg font-bold text-surface-100">
-              {packageSummary.activeCount}
+              {totalPurchases}
             </p>
-            <p className="text-xs text-surface-500 mt-1">
-              {formatCurrency(packageSummary.totalActiveInvestment)} invested
-            </p>
+            <p className="text-xs text-surface-500 mt-1">total packages</p>
           </Card>
         </Link>
 
@@ -159,25 +138,23 @@ export function DashboardPage() {
               <span className="text-xs font-medium">Referrals</span>
             </div>
             <p className="text-lg font-bold text-surface-100">
-              {referralSummary.referralCount}
+              {totalReferrals}
             </p>
-            <p className="text-xs text-success-500 mt-1">
-              {formatCurrency(referralSummary.totalEarnings)} earned
-            </p>
+            <p className="text-xs text-surface-500 mt-1">people referred</p>
           </Card>
         </Link>
 
-        {/* Withdrawals */}
-        <Link to="/withdraw">
+        {/* Bonus Status */}
+        <Link to="/profile">
           <Card hoverable className="h-full">
             <div className="flex items-center gap-2 text-surface-400 mb-2">
-              <Send className="h-4 w-4 text-surface-400" />
-              <span className="text-xs font-medium">Pending</span>
+              <TrendingUp className="h-4 w-4 text-success-500" />
+              <span className="text-xs font-medium">Bonus</span>
             </div>
-            <p className="text-lg font-bold text-surface-100">
-              {formatCurrency(pendingWithdrawalAmount)}
+            <p className="text-lg font-bold text-surface-100 capitalize">
+              {user.bonusStatus}
             </p>
-            <p className="text-xs text-surface-500 mt-1">withdrawal amount</p>
+            <p className="text-xs text-surface-500 mt-1">100 ETB bonus</p>
           </Card>
         </Link>
       </div>
@@ -185,14 +162,12 @@ export function DashboardPage() {
       {/* Quick actions row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Daily Claim Card */}
-        {dailyIncome.canClaim && !dailyIncome.todayClaimed && (
+        {hasEligibleClaims && (
           <Link to="/daily-income">
             <Card
               variant="bordered"
               hoverable
-              className={clsx(
-                'border-warning-500/30 bg-gradient-to-r from-warning-500/5 to-transparent'
-              )}
+              className="border-warning-500/30 bg-gradient-to-r from-warning-500/5 to-transparent"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -204,7 +179,7 @@ export function DashboardPage() {
                       Claim Today's Income
                     </p>
                     <p className="text-xs text-surface-400">
-                      {formatCurrency(dailyIncome.totalClaimableToday)} available
+                      {eligibleClaims.length} package{eligibleClaims.length > 1 ? 's' : ''} ready
                     </p>
                   </div>
                 </div>
@@ -215,7 +190,7 @@ export function DashboardPage() {
         )}
 
         {/* Notifications */}
-        {unreadNotifications > 0 && (
+        {(unreadCount ?? 0) > 0 && (
           <Link to="/notifications">
             <Card variant="bordered" hoverable>
               <div className="flex items-center justify-between">
@@ -225,7 +200,7 @@ export function DashboardPage() {
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-surface-100">
-                      {unreadNotifications} Unread Notification{unreadNotifications > 1 ? 's' : ''}
+                      {unreadCount} Unread Notification{(unreadCount ?? 0) > 1 ? 's' : ''}
                     </p>
                     <p className="text-xs text-surface-400">Tap to view</p>
                   </div>

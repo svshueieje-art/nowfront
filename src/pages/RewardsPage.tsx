@@ -18,7 +18,7 @@ export function RewardsPage() {
   const [code, setCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [result, setResult] = useState<{ amount: number; message: string } | null>(null);
+  const [result, setResult] = useState<{ amount: string; message: string } | null>(null);
 
   const handleRedeem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,13 +32,13 @@ export function RewardsPage() {
 
     setIsSubmitting(true);
     try {
-      const res = await rewardsApi.redeemCode({ code: code.trim().toUpperCase() });
-      setResult({ amount: res.rewardAmount, message: res.message });
+      const res = await rewardsApi.redeemCode(code.trim().toUpperCase());
+      setResult({ amount: res.amount, message: res.message });
       setCode('');
       addToast({
         type: 'success',
         title: 'Reward Redeemed!',
-        message: `${res.rewardAmount} ETB has been added to your wallet.`,
+        message: `${res.amount} ETB has been added to your wallet.`,
       });
       await queryClient.invalidateQueries({ queryKey: ['wallet'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
@@ -80,7 +80,7 @@ export function RewardsPage() {
               <div className="text-center p-4 rounded-xl bg-success-500/10 border border-success-500/20">
                 <CheckCircle2 className="h-8 w-8 text-success-500 mx-auto mb-2" />
                 <p className="text-sm font-medium text-success-500 mb-1">{result.message}</p>
-                <CurrencyDisplay amount={result.amount} size="lg" positive />
+                <CurrencyDisplay amount={parseFloat(result.amount)} size="lg" positive />
               </div>
             )}
 

@@ -1,5 +1,6 @@
 // ========================================
 // API Service Modules
+// Aligned with backend routes as source of truth
 // ========================================
 
 import { apiClient } from './client';
@@ -7,38 +8,42 @@ import type {
   LoginRequest,
   RegisterRequest,
   User,
-  DashboardData,
-  Wallet,
   CoffeePackage,
   UserPackage,
   WalletPurchaseRequest,
-  DirectPaymentRequest,
-  PaymentAccountInfo,
+  PaymentMethodInfo,
   Purchase,
   Transaction,
   TransactionFilters,
   PaginatedResponse,
-  ClaimResult,
   ReferralInfo,
-  WithdrawalMethodInfo,
   WithdrawalRequest,
   WithdrawalFeeCalculation,
   Withdrawal,
-  RewardRedemptionRequest,
   RewardRedemptionResult,
   Notification,
   ChangePasswordRequest,
+  WalletBalance,
+  DailyClaim,
+  Referral,
+  ReferralCommission,
 } from '@/types';
 
-// ---- Auth ----
+// Helper to unwrap { success, data } responses
+interface ApiWrapper<T> {
+  success: boolean;
+  data: T;
+}
+
+// ---- Auth (/api/v1/auth) ----
 export const authApi = {
   register: async (data: RegisterRequest): Promise<User> => {
-    const res = await apiClient.post<{ success: boolean; data: User }>('/auth/register', data);
+    const res = await apiClient.post<ApiWrapper<User>>('/auth/register', data);
     return res.data.data;
   },
 
   login: async (data: LoginRequest): Promise<User> => {
-    const res = await apiClient.post<{ success: boolean; data: User }>('/auth/login', data);
+    const res = await apiClient.post<ApiWrapper<User>>('/auth/login', data);
     return res.data.data;
   },
 
@@ -47,192 +52,198 @@ export const authApi = {
   },
 
   getMe: async (): Promise<User> => {
-    const res = await apiClient.get<{ success: boolean; data: User }>('/auth/me');
+    const res = await apiClient.get<ApiWrapper<User>>('/auth/me');
+    return res.data.data;
+  },
+
+  changePassword: async (data: ChangePasswordRequest): Promise<void> => {
+    await apiClient.put('/auth/change-password', data);
+  },
+};
+
+// ---- Packages (/api/v1/packages) ----
+export const packagesApi = {
+  getAvailablePackages: async (): Promise<CoffeePackage[]> => {
+    const res = await apiClient.get<ApiWrapper<CoffeePackage[]>>('/packages');
     return res.data.data;
   },
 };
 
-// ---- Dashboard ----
-export const dashboardApi = {
-  getDashboard: async (): Promise<DashboardData> => {
-    const res = await apiClient.get<DashboardData>('/dashboard');
-    return res.data;
-  },
-};
-
-// ---- Wallet ----
-export const walletApi = {
-  getWallet: async (): Promise<Wallet> => {
-    const res = await apiClient.get<Wallet>('/wallet');
-    return res.data;
-  },
-};
-
-// ---- Packages ----
-export const packagesApi = {
-  getAvailablePackages: async (): Promise<CoffeePackage[]> => {
-    const res = await apiClient.get<{ packages: CoffeePackage[] }>('/packages');
-    return res.data.packages;
-  },
-
-  getMyPackages: async (): Promise<UserPackage[]> => {
-    const res = await apiClient.get<{ packages: UserPackage[] }>('/packages/my');
-    return res.data.packages;
-  },
-
-  getPackageById: async (id: string): Promise<UserPackage> => {
-    const res = await apiClient.get<{ package: UserPackage }>(`/packages/my/${id}`);
-    return res.data.package;
-  },
-};
-
-// ---- Purchases ----
+// ---- Purchases (/api/v1/purchases) ----
 export const purchasesApi = {
   purchaseWithWallet: async (data: WalletPurchaseRequest): Promise<Purchase> => {
-    const res = await apiClient.post<{ purchase: Purchase }>('/purchases/wallet', data);
-    return res.data.purchase;
+    const res = await apiClient.post<ApiWrapper<Purchase>>('/purchases/wallet', data);
+    return res.data.data;
   },
 
-  createDirectPayment: async (data: DirectPaymentRequest): Promise<Purchase> => {
-    const res = await apiClient.post<{ purchase: Purchase }>('/purchases/direct', data);
-    return res.data.purchase;
-  },
-
-  uploadPaymentProof: async (purchaseId: string, file: File): Promise<{ url: string }> => {
-    const formData = new FormData();
-    formData.append('proof', file);
-    const res = await apiClient.post<{ url: string }>(
-      `/purchases/${purchaseId}/proof`,
-      formData,
+  createDirectPayment: async (data: FormData): Promise<Purchase> => {
+    const res = await apiClient.post<ApiWrapper<Purchase>>(
+      '/purchases/direct-payment',
+      data,
       {
         headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 60000,
       }
     );
-    return res.data;
+    return res.data.data;
   },
 
-  getPaymentAccountInfo: async (): Promise<PaymentAccountInfo> => {
-    const res = await apiClient.get<PaymentAccountInfo>('/purchases/payment-info');
-    return res.data;
-  },
-
-  getMyPurchases: async (): Promise<Purchase[]> => {
-    const res = await apiClient.get<{ purchases: Purchase[] }>('/purchases/my');
-    return res.data.purchases;
+  getMyPurchases: async (
+    page = 1,
+    limit = 20,
+    status?: string
+  ): Promise<PaginatedResponse<UserPackage>> => {
+    const res = await apiClient.get<{ success: boolean; data: UserPackage[]; pagination: PaginatedResponse<UserPackage>['pagination'] }>(
+      '/purchases',
+      { params: { page, limit, status } }
+    );
+    return { data: res.data.data, pagination: res.data.pagination };
   },
 };
 
-// ---- Transactions ----
-export const transactionsApi = {
+// ---- Wallet (/api/v1/wallet) ----
+export const walletApi = {
+  getBalance: async (): Promise<WalletBalance> => {
+    const res = await apiClient.get<ApiWrapper<WalletBalance>>('/wallet/balance');
+    return res.data.data;
+  },
+
   getTransactions: async (
     filters?: TransactionFilters
   ): Promise<PaginatedResponse<Transaction>> => {
-    const res = await apiClient.get<PaginatedResponse<Transaction>>('/transactions', {
-      params: filters,
-    });
-    return res.data;
+    const res = await apiClient.get<{ success: boolean; data: Transaction[]; pagination: PaginatedResponse<Transaction>['pagination'] }>(
+      '/wallet/transactions',
+      { params: filters }
+    );
+    return { data: res.data.data, pagination: res.data.pagination };
   },
 };
 
-// ---- Daily Claims ----
+// ---- Daily Claims (/api/v1/claims) ----
 export const claimsApi = {
-  claimDailyIncome: async (): Promise<ClaimResult> => {
-    const res = await apiClient.post<ClaimResult>('/claims/daily');
-    return res.data;
+  getEligibleClaims: async (): Promise<DailyClaim[]> => {
+    const res = await apiClient.get<ApiWrapper<DailyClaim[]>>('/claims/eligible');
+    return res.data.data;
+  },
+
+  claimDailyIncome: async (purchaseId: string): Promise<DailyClaim> => {
+    const res = await apiClient.post<ApiWrapper<DailyClaim>>('/claims', { purchaseId });
+    return res.data.data;
   },
 
   getClaimHistory: async (
-    userPackageId?: string
-  ): Promise<PaginatedResponse<import('@/types').DailyClaim>> => {
-    const res = await apiClient.get<PaginatedResponse<import('@/types').DailyClaim>>(
-      '/claims/history',
-      {
-        params: userPackageId ? { userPackageId } : undefined,
-      }
+    purchaseId: string,
+    page = 1,
+    limit = 20
+  ): Promise<PaginatedResponse<DailyClaim>> => {
+    const res = await apiClient.get<{ success: boolean; data: DailyClaim[]; pagination: PaginatedResponse<DailyClaim>['pagination'] }>(
+      `/claims/history/${purchaseId}`,
+      { params: { page, limit } }
     );
-    return res.data;
+    return { data: res.data.data, pagination: res.data.pagination };
   },
 };
 
-// ---- Referrals ----
+// ---- Referrals (/api/v1/referrals) ----
 export const referralsApi = {
   getReferralInfo: async (): Promise<ReferralInfo> => {
-    const res = await apiClient.get<ReferralInfo>('/referrals');
-    return res.data;
+    const res = await apiClient.get<ApiWrapper<ReferralInfo>>('/referrals/info');
+    return res.data.data;
+  },
+
+  getReferrals: async (
+    page = 1,
+    limit = 20
+  ): Promise<PaginatedResponse<Referral>> => {
+    const res = await apiClient.get<{ success: boolean; data: Referral[]; pagination: PaginatedResponse<Referral>['pagination'] }>(
+      '/referrals',
+      { params: { page, limit } }
+    );
+    return { data: res.data.data, pagination: res.data.pagination };
+  },
+
+  getCommissions: async (
+    page = 1,
+    limit = 20
+  ): Promise<PaginatedResponse<ReferralCommission>> => {
+    const res = await apiClient.get<{ success: boolean; data: ReferralCommission[]; pagination: PaginatedResponse<ReferralCommission>['pagination'] }>(
+      '/referrals/commissions',
+      { params: { page, limit } }
+    );
+    return { data: res.data.data, pagination: res.data.pagination };
   },
 };
 
-// ---- Withdrawals ----
+// ---- Withdrawals (/api/v1/withdrawals) ----
 export const withdrawalsApi = {
-  getMethods: async (): Promise<WithdrawalMethodInfo[]> => {
-    const res = await apiClient.get<{ methods: WithdrawalMethodInfo[] }>(
-      '/withdrawals/methods'
+  previewWithdrawal: async (amount: string): Promise<WithdrawalFeeCalculation> => {
+    const res = await apiClient.post<ApiWrapper<WithdrawalFeeCalculation>>(
+      '/withdrawals/preview',
+      { amount }
     );
-    return res.data.methods;
-  },
-
-  calculateFee: async (amount: number): Promise<WithdrawalFeeCalculation> => {
-    const res = await apiClient.get<WithdrawalFeeCalculation>('/withdrawals/calculate-fee', {
-      params: { amount },
-    });
-    return res.data;
+    return res.data.data;
   },
 
   requestWithdrawal: async (data: WithdrawalRequest): Promise<Withdrawal> => {
-    const res = await apiClient.post<{ withdrawal: Withdrawal }>('/withdrawals', data);
-    return res.data.withdrawal;
+    const res = await apiClient.post<ApiWrapper<Withdrawal>>('/withdrawals', data);
+    return res.data.data;
   },
 
-  getMyWithdrawals: async (): Promise<Withdrawal[]> => {
-    const res = await apiClient.get<{ withdrawals: Withdrawal[] }>('/withdrawals/my');
-    return res.data.withdrawals;
+  getMyWithdrawals: async (
+    page = 1,
+    limit = 20,
+    status?: string
+  ): Promise<PaginatedResponse<Withdrawal>> => {
+    const res = await apiClient.get<{ success: boolean; data: Withdrawal[]; pagination: PaginatedResponse<Withdrawal>['pagination'] }>(
+      '/withdrawals',
+      { params: { page, limit, status } }
+    );
+    return { data: res.data.data, pagination: res.data.pagination };
   },
 };
 
-// ---- Reward Codes ----
+// ---- Reward Codes (/api/v1/rewards) ----
 export const rewardsApi = {
-  redeemCode: async (data: RewardRedemptionRequest): Promise<RewardRedemptionResult> => {
-    const res = await apiClient.post<RewardRedemptionResult>('/rewards/redeem', data);
-    return res.data;
+  redeemCode: async (code: string): Promise<RewardRedemptionResult> => {
+    const res = await apiClient.post<ApiWrapper<RewardRedemptionResult>>(
+      '/rewards/redeem',
+      { code }
+    );
+    return res.data.data;
   },
 };
 
-// ---- Notifications ----
+// ---- Notifications (/api/v1/notifications) ----
 export const notificationsApi = {
   getNotifications: async (
     page = 1,
     limit = 20
   ): Promise<PaginatedResponse<Notification>> => {
-    const res = await apiClient.get<PaginatedResponse<Notification>>('/notifications', {
-      params: { page, limit },
-    });
-    return res.data;
+    const res = await apiClient.get<{ success: boolean; data: Notification[]; pagination: PaginatedResponse<Notification>['pagination'] }>(
+      '/notifications',
+      { params: { page, limit } }
+    );
+    return { data: res.data.data, pagination: res.data.pagination };
   },
 
   markAsRead: async (id: string): Promise<void> => {
-    await apiClient.patch(`/notifications/${id}/read`);
+    await apiClient.put(`/notifications/${id}/read`);
   },
 
   markAllAsRead: async (): Promise<void> => {
-    await apiClient.patch('/notifications/read-all');
+    await apiClient.put('/notifications/read-all');
   },
 
   getUnreadCount: async (): Promise<number> => {
-    const res = await apiClient.get<{ count: number }>('/notifications/unread-count');
-    return res.data.count;
+    const res = await apiClient.get<ApiWrapper<{ unreadCount: number }>>('/notifications/unread-count');
+    return res.data.data.unreadCount;
   },
 };
 
-// ---- Profile ----
-export const profileApi = {
-  getProfile: async (): Promise<User> => {
-    const res = await apiClient.get<{ user: User }>('/profile');
-    return res.data.user;
-  },
-
-  changePassword: async (data: ChangePasswordRequest): Promise<{ message: string }> => {
-    const res = await apiClient.post<{ message: string }>('/profile/change-password', data);
-    return res.data;
+// ---- Payment Methods (/api/v1/payment-methods) ----
+export const paymentMethodsApi = {
+  getPaymentMethods: async (): Promise<PaymentMethodInfo[]> => {
+    const res = await apiClient.get<ApiWrapper<PaymentMethodInfo[]>>('/payment-methods');
+    return res.data.data;
   },
 };

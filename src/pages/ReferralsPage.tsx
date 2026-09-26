@@ -1,5 +1,5 @@
 // ========================================
-// Referrals Page
+// Referrals Page — /referrals/info + /referrals
 // ========================================
 
 import { useQuery } from '@tanstack/react-query';
@@ -12,7 +12,6 @@ import {
   EmptyState,
   ListSkeleton,
   StatSkeleton,
-  StatusBadge,
 } from '@/components/ui';
 import { CurrencyDisplay } from '@/components/ui';
 import { formatDate, copyToClipboard, generateReferralLink } from '@/lib/utils';
@@ -22,9 +21,15 @@ import { useState } from 'react';
 export function ReferralsPage() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  const { data: referralInfo, isLoading, error } = useQuery({
-    queryKey: ['referrals'],
+  const { data: referralInfo, isLoading: loadingInfo, error: errorInfo } = useQuery({
+    queryKey: ['referrals', 'info'],
     queryFn: referralsApi.getReferralInfo,
+    staleTime: 30000,
+  });
+
+  const { data: referrals, isLoading: loadingReferrals } = useQuery({
+    queryKey: ['referrals', 'list'],
+    queryFn: () => referralsApi.getReferrals(1, 50),
     staleTime: 30000,
   });
 
@@ -36,7 +41,7 @@ export function ReferralsPage() {
     }
   };
 
-  if (isLoading) {
+  if (loadingInfo) {
     return (
       <div className="space-y-6 animate-fade-in">
         <PageHeader title="Referrals" />
@@ -46,7 +51,7 @@ export function ReferralsPage() {
     );
   }
 
-  if (error || !referralInfo) {
+  if (errorInfo || !referralInfo) {
     return (
       <div className="space-y-6">
         <PageHeader title="Referrals" />
@@ -55,7 +60,8 @@ export function ReferralsPage() {
     );
   }
 
-  const referralLink = referralInfo.referralLink || generateReferralLink(referralInfo.referralCode);
+  const referralLink = generateReferralLink(referralInfo.referralCode);
+  const totalEarnings = parseFloat(referralInfo.totalCommissionsEarned);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -71,14 +77,13 @@ export function ReferralsPage() {
             <Users className="h-4 w-4 text-info-500" />
             <span className="text-xs font-medium">Total Referrals</span>
           </div>
-          <p className="text-2xl font-bold text-surface-100">{referralInfo.referralCount}</p>
+          <p className="text-2xl font-bold text-surface-100">{referralInfo.totalReferrals}</p>
         </Card>
         <Card variant="glass">
           <div className="flex items-center gap-2 text-surface-400 mb-1">
-            <CurrencyDisplay amount={0} size="sm" className="hidden" />
             <span className="text-xs font-medium">Total Earnings</span>
           </div>
-          <CurrencyDisplay amount={referralInfo.totalEarnings} size="lg" positive={referralInfo.totalEarnings > 0} />
+          <CurrencyDisplay amount={totalEarnings} size="lg" positive={totalEarnings > 0} />
         </Card>
       </div>
 
@@ -151,7 +156,9 @@ export function ReferralsPage() {
       {/* Referral History */}
       <div>
         <h2 className="text-base font-semibold text-surface-100 mb-3">Referral History</h2>
-        {referralInfo.referrals.length === 0 ? (
+        {loadingReferrals ? (
+          <ListSkeleton rows={5} />
+        ) : !referrals?.data?.length ? (
           <EmptyState
             icon={<Users className="h-10 w-10" />}
             title="No referrals yet"
@@ -159,22 +166,16 @@ export function ReferralsPage() {
           />
         ) : (
           <div className="space-y-2">
-            {referralInfo.referrals.map((ref) => (
+            {referrals.data.map((ref) => (
               <Card key={ref.id} variant="bordered" padding="sm">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-surface-200">
-                      {ref.referredUserPhone}
+                      {ref.fullName || ref.phone}
                     </p>
                     <p className="text-xs text-surface-500">
-                      {ref.packageName} • {formatDate(ref.createdAt)}
+                      {ref.totalPurchases} purchases • Joined {formatDate(ref.joinedAt)}
                     </p>
-                  </div>
-                  <div className="text-right">
-                    <CurrencyDisplay amount={ref.commission} size="sm" positive />
-                    <div className="mt-0.5">
-                      <StatusBadge status={ref.status} />
-                    </div>
                   </div>
                 </div>
               </Card>

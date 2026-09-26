@@ -1,10 +1,10 @@
 // ========================================
-// Wallet Page
+// Wallet Page — uses /wallet/balance + /wallet/transactions
 // ========================================
 
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { walletApi, transactionsApi } from '@/api';
+import { walletApi } from '@/api';
 import {
   Card,
   PageHeader,
@@ -13,7 +13,6 @@ import {
   StatSkeleton,
   ListSkeleton,
   EmptyState,
-  StatusBadge,
 } from '@/components/ui';
 import { CurrencyDisplay } from '@/components/ui';
 import { formatCurrency, formatRelativeTime, getTransactionTypeLabel, isPositiveTransaction } from '@/lib/utils';
@@ -22,8 +21,6 @@ import {
   Coffee,
   Send,
   Lock,
-  TrendingUp,
-  Clock,
   ArrowDownLeft,
   ArrowUpRight,
   ArrowDownUp,
@@ -31,14 +28,14 @@ import {
 
 export function WalletPage() {
   const { data: wallet, isLoading: loadingWallet, error: walletError } = useQuery({
-    queryKey: ['wallet'],
-    queryFn: walletApi.getWallet,
+    queryKey: ['wallet', 'balance'],
+    queryFn: walletApi.getBalance,
     staleTime: 15000,
   });
 
   const { data: recentTx, isLoading: loadingTx } = useQuery({
-    queryKey: ['transactions', { page: 1, limit: 10 }],
-    queryFn: () => transactionsApi.getTransactions({ page: 1, limit: 10 }),
+    queryKey: ['wallet', 'transactions', { page: 1, limit: 10 }],
+    queryFn: () => walletApi.getTransactions({ page: 1, limit: 10 }),
     staleTime: 15000,
   });
 
@@ -73,34 +70,16 @@ export function WalletPage() {
             <WalletIcon className="h-4 w-4" />
             <span className="text-sm font-medium">Available Balance</span>
           </div>
-          <CurrencyDisplay amount={wallet.availableBalance} size="xl" />
+          <CurrencyDisplay amount={parseFloat(wallet.availableBalance)} size="xl" />
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-5 pt-5 border-t border-surface-800">
+          <div className="grid grid-cols-2 gap-4 mt-5 pt-5 border-t border-surface-800">
             <div>
               <div className="flex items-center gap-1.5 text-surface-500 mb-1">
                 <Lock className="h-3.5 w-3.5" />
-                <span className="text-xs">Locked Bonus</span>
+                <span className="text-xs">Locked Balance</span>
               </div>
               <p className="text-sm font-semibold text-surface-300">
-                {formatCurrency(wallet.lockedBonus)}
-              </p>
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 text-surface-500 mb-1">
-                <TrendingUp className="h-3.5 w-3.5 text-success-500" />
-                <span className="text-xs">Total Earned</span>
-              </div>
-              <p className="text-sm font-semibold text-success-500">
-                {formatCurrency(wallet.totalEarned)}
-              </p>
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 text-surface-500 mb-1">
-                <Clock className="h-3.5 w-3.5 text-warning-500" />
-                <span className="text-xs">Pending</span>
-              </div>
-              <p className="text-sm font-semibold text-warning-500">
-                {formatCurrency(wallet.pendingWithdrawals)}
+                {formatCurrency(parseFloat(wallet.lockedBalance))}
               </p>
             </div>
           </div>
@@ -168,16 +147,11 @@ export function WalletPage() {
                     </div>
                     <div className="text-right flex-shrink-0">
                       <CurrencyDisplay
-                        amount={tx.amount}
+                        amount={parseFloat(tx.amount)}
                         size="sm"
                         positive={positive}
                         negative={!positive}
                       />
-                      {tx.status !== 'completed' && (
-                        <div className="mt-0.5">
-                          <StatusBadge status={tx.status} />
-                        </div>
-                      )}
                     </div>
                   </div>
                 </Card>

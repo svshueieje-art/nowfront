@@ -1,10 +1,10 @@
 // ========================================
-// Withdrawals Page
+// Withdrawals Page — /withdrawals + /payment-methods + /wallet/balance
 // ========================================
 
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { withdrawalsApi, walletApi } from '@/api';
+import { withdrawalsApi, walletApi, paymentMethodsApi } from '@/api';
 import { ApiError } from '@/api';
 import { useToast } from '@/hooks/useToast';
 import {
@@ -23,14 +23,14 @@ import {
 import { CurrencyDisplay } from '@/components/ui';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { Send, Wallet } from 'lucide-react';
-import type { WithdrawalFeeCalculation, WithdrawalMethod } from '@/types';
+import type { WithdrawalFeeCalculation } from '@/types';
 
 export function WithdrawPage() {
   const { addToast } = useToast();
   const queryClient = useQueryClient();
 
   const [amount, setAmount] = useState('');
-  const [method, setMethod] = useState('');
+  const [selectedMethodId, setSelectedMethodId] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [accountName, setAccountName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,26 +40,27 @@ export function WithdrawPage() {
   const [feeCalc, setFeeCalc] = useState<WithdrawalFeeCalculation | null>(null);
 
   const { data: wallet, isLoading: loadingWallet } = useQuery({
-    queryKey: ['wallet'],
-    queryFn: walletApi.getWallet,
+    queryKey: ['wallet', 'balance'],
+    queryFn: walletApi.getBalance,
     staleTime: 15000,
   });
 
-  const { data: methods, isLoading: loadingMethods } = useQuery({
-    queryKey: ['withdrawal-methods'],
-    queryFn: withdrawalsApi.getMethods,
+  const { data: paymentMethods, isLoading: loadingMethods } = useQuery({
+    queryKey: ['payment-methods'],
+    queryFn: paymentMethodsApi.getPaymentMethods,
     staleTime: 60000,
   });
 
   const { data: withdrawals, isLoading: loadingHistory } = useQuery({
     queryKey: ['withdrawals', 'my'],
-    queryFn: withdrawalsApi.getMyWithdrawals,
+    queryFn: () => withdrawalsApi.getMyWithdrawals(),
     staleTime: 15000,
   });
 
-  const methodOptions = (methods ?? [])
-    .filter((m) => m.enabled)
-    .map((m) => ({ value: m.id, label: m.name }));
+  const methodOptions = (paymentMethods ?? []).map((m) => ({
+    value: m.id,
+    label: m.displayName || m.name,
+  }));
 
   const handlePreview = async () => {
     setError('');
@@ -70,7 +71,7 @@ export function WithdrawPage() {
     if (!amount || isNaN(parsedAmount) || parsedAmount <= 0) {
       errors['amount'] = 'Enter a valid amount';
     }
-    if (!method) {
+    if (!selectedMethodId) {
       errors['method'] = 'Select a payment method';
     }
     if (!accountNumber.trim()) {
@@ -86,7 +87,7 @@ export function WithdrawPage() {
     }
 
     try {
-      const calc = await withdrawalsApi.calculateFee(parsedAmount);
+      const calc = await withdrawalsApi.previewWithdrawal(amount);
       setFeeCalc(calc);
       setShowConfirm(true);
     } catch (err) {
@@ -103,8 +104,8 @@ export function WithdrawPage() {
     setError('');
     try {
       await withdrawalsApi.requestWithdrawal({
-        amount: Number(amount),
-        method: method as WithdrawalMethod,
+        amount,
+        paymentMethodId: selectedMethodId,
         accountNumber: accountNumber.trim(),
         accountName: accountName.trim(),
       });
@@ -115,14 +116,12 @@ export function WithdrawPage() {
       });
       setShowConfirm(false);
       setAmount('');
-      setMethod('');
+      setSelectedMethodId('');
       setAccountNumber('');
       setAccountName('');
       setFeeCalc(null);
       await queryClient.invalidateQueries({ queryKey: ['wallet'] });
       await queryClient.invalidateQueries({ queryKey: ['withdrawals'] });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      await queryClient.invalidateQueries({ queryKey: ['transactions'] });
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -155,7 +154,7 @@ export function WithdrawPage() {
             <Wallet className="h-4 w-4" />
             <span className="text-sm font-medium">Available Balance</span>
           </div>
-          <CurrencyDisplay amount={wallet.availableBalance} size="lg" />
+          <CurrencyDisplay amount={parseFloat(wallet.availableBalance)} size="lg" />
         </Card>
       ) : null}
 
@@ -177,8 +176,8 @@ export function WithdrawPage() {
           <Select
             label="Payment Method"
             options={methodOptions}
-            value={method}
-            onChange={(e) => setMethod(e.target.value)}
+            value={selectedMethodId}
+            onChange={(e) => setSelectedMethodId(e.target.value)}
             placeholder="Select payment method"
             error={fieldErrors['method']}
             disabled={isSubmitting || loadingMethods}
@@ -225,23 +224,20 @@ export function WithdrawPage() {
               <div className="flex justify-between">
                 <span className="text-surface-400">Requested Amount</span>
                 <span className="text-surface-100 font-medium">
-                  {formatCurrency(feeCalc.grossAmount)}
+                  {formatCurrency(parseFloat(feeCalc.grossAmount))}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-surface-400">Fee</span>
+                <span className="text-surface-400">Fee ({feeCalc.feeRate}%)</span>
                 <span className="text-danger-500">
-                  -{formatCurrency(feeCalc.fee)}
+                  -{formatCurrency(parseFloat(feeCalc.feeAmount))}
                 </span>
               </div>
-              {feeCalc.feeDescription && (
-                <p className="text-xs text-surface-500">{feeCalc.feeDescription}</p>
-              )}
               <div className="h-px bg-surface-700" />
               <div className="flex justify-between">
                 <span className="text-surface-300 font-medium">You will receive</span>
                 <span className="text-surface-100 font-bold text-base">
-                  {formatCurrency(feeCalc.netAmount)}
+                  {formatCurrency(parseFloat(feeCalc.netAmount))}
                 </span>
               </div>
             </div>
@@ -267,7 +263,7 @@ export function WithdrawPage() {
         <h2 className="text-base font-semibold text-surface-100 mb-3">Withdrawal History</h2>
         {loadingHistory ? (
           <ListSkeleton rows={5} />
-        ) : !withdrawals?.length ? (
+        ) : !withdrawals?.data?.length ? (
           <EmptyState
             icon={<Send className="h-10 w-10" />}
             title="No withdrawals yet"
@@ -275,27 +271,24 @@ export function WithdrawPage() {
           />
         ) : (
           <div className="space-y-2">
-            {withdrawals.map((w) => (
+            {withdrawals.data.map((w) => (
               <Card key={w.id} variant="bordered" padding="sm">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium text-surface-200">
-                        {formatCurrency(w.amount)}
+                        {formatCurrency(parseFloat(w.grossAmount))}
                       </p>
                       <StatusBadge status={w.status} />
                     </div>
                     <p className="text-xs text-surface-500 mt-0.5">
-                      {w.methodName} • {w.accountNumber} • {formatDate(w.createdAt)}
+                      {formatDate(w.createdAt)}
                     </p>
-                    {w.rejectionReason && (
-                      <p className="text-xs text-danger-500 mt-1">{w.rejectionReason}</p>
-                    )}
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-surface-500">Net</p>
                     <p className="text-sm font-semibold text-surface-200">
-                      {formatCurrency(w.netAmount)}
+                      {formatCurrency(parseFloat(w.netAmount))}
                     </p>
                   </div>
                 </div>

@@ -29,9 +29,8 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { clsx } from 'clsx';
-import type { NotificationType } from '@/types';
 
-function getNotificationIcon(type: NotificationType) {
+function getNotificationIcon(type: string) {
   switch (type) {
     case 'payment_approved':
       return <CheckCircle2 className="h-4 w-4 text-success-500" />;
@@ -88,7 +87,7 @@ export function NotificationsPage() {
     }
   };
 
-  const hasUnread = data?.data.some((n) => !n.read);
+  const hasUnread = data?.data.some((n) => !n.isRead);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -124,17 +123,17 @@ export function NotificationsPage() {
             {data.data.map((notification) => (
               <button
                 key={notification.id}
-                onClick={() => !notification.read && handleMarkAsRead(notification.id)}
+                onClick={() => !notification.isRead && handleMarkAsRead(notification.id)}
                 className={clsx(
                   'w-full text-left focus-ring rounded-xl transition-all',
-                  !notification.read && 'ring-1 ring-brand-500/20'
+                  !notification.isRead && 'ring-1 ring-brand-500/20'
                 )}
               >
                 <Card
                   variant="bordered"
                   padding="sm"
                   className={clsx(
-                    !notification.read && 'bg-brand-500/5 border-brand-500/15'
+                    !notification.isRead && 'bg-brand-500/5 border-brand-500/15'
                   )}
                 >
                   <div className="flex items-start gap-3">
@@ -146,12 +145,12 @@ export function NotificationsPage() {
                         <h3
                           className={clsx(
                             'text-sm font-medium',
-                            notification.read ? 'text-surface-300' : 'text-surface-100'
+                            notification.isRead ? 'text-surface-300' : 'text-surface-100'
                           )}
                         >
                           {notification.title}
                         </h3>
-                        {!notification.read && (
+                        {!notification.isRead && (
                           <span className="h-2 w-2 rounded-full bg-brand-500 flex-shrink-0 mt-1.5" />
                         )}
                       </div>

@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/useToast';
-import { profileApi } from '@/api';
+import { authApi } from '@/api';
 import { ApiError } from '@/api';
 import {
   Card,
@@ -61,10 +61,9 @@ export function ProfilePage() {
 
     setIsChangingPassword(true);
     try {
-      await profileApi.changePassword({
+      await authApi.changePassword({
         currentPassword,
         newPassword,
-        confirmNewPassword,
       });
       addToast({ type: 'success', title: 'Password changed successfully' });
       setShowChangePassword(false);

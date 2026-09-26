@@ -1,8 +1,9 @@
 // ========================================
 // Domain Types — Buna Investors Group
+// Aligned with backend response shapes
 // ========================================
 
-// ---- User ----
+// ---- User (from /auth/me) ----
 export interface User {
   id: string;
   phone: string;
@@ -34,84 +35,46 @@ export interface RegisterRequest {
   referralCode?: string;
 }
 
-export interface AuthResponse {
-  user: User;
-  message: string;
+// ---- Wallet Balance (from /wallet/balance) ----
+export interface WalletBalance {
+  availableBalance: string;
+  lockedBalance: string;
+  totalEarned?: string;
 }
 
-// ---- Wallet ----
-export interface Wallet {
-  availableBalance: number;
-  lockedBonus: number;
-  totalEarned: number;
-  pendingWithdrawals: number;
-}
-
-// ---- Dashboard ----
-export interface DashboardData {
-  wallet: Wallet;
-  dailyIncome: DailyIncomeStatus;
-  packageSummary: PackageSummary;
-  referralSummary: ReferralSummary;
-  pendingWithdrawalAmount: number;
-  unreadNotifications: number;
-}
-
-export interface DailyIncomeStatus {
-  canClaim: boolean;
-  todayClaimed: boolean;
-  todayAmount: number;
-  activePackages: number;
-  totalClaimableToday: number;
-}
-
-export interface PackageSummary {
-  activeCount: number;
-  totalActiveInvestment: number;
-  maturedCount: number;
-  totalPackages: number;
-}
-
-export interface ReferralSummary {
-  totalEarnings: number;
-  referralCount: number;
-}
-
-// ---- Coffee Packages ----
-export type PackageStatus = 'available' | 'disabled' | 'coming_soon';
-export type PurchaseStatus = 'pending' | 'approved' | 'rejected' | 'active' | 'completed' | 'cancelled';
-export type UserPackageStatus = 'pending' | 'active' | 'matured' | 'rejected' | 'cancelled';
-
+// ---- Coffee Packages (from /packages) ----
 export interface CoffeePackage {
   id: string;
   name: string;
   vipLevel: number;
-  price: number;
-  dailyIncome: number;
-  duration: number;
+  price: string;
+  dailyIncomeRate: string;
+  durationDays: number;
   description?: string;
-  status: PackageStatus;
-  displayOrder: number;
 }
+
+// ---- User Packages / Purchases (from /purchases) ----
+export type PurchaseStatus = 'PENDING_PAYMENT' | 'PENDING_ACTIVATION' | 'ACTIVE' | 'COMPLETED' | 'REJECTED' | 'CANCELLED';
 
 export interface UserPackage {
   id: string;
-  packageId: string;
+  snapshotName: string;
+  purchasePrice: string;
+  status: PurchaseStatus;
+  activationDate?: string | null;
+  firstClaimDate?: string | null;
+  maturityDate?: string | null;
+  createdAt: string;
+}
+
+export interface Purchase {
+  id: string;
   packageName: string;
-  vipLevel: number;
-  price: number;
-  dailyIncome: number;
-  purchaseDate: string;
-  activationDate: string | null;
-  maturityDate: string | null;
-  claimedDays: number;
-  missedDays: number;
-  totalClaimedIncome: number;
-  remainingDays: number;
-  status: UserPackageStatus;
-  canClaimToday: boolean;
-  todayClaimed: boolean;
-  rejectionReason?: string;
+  price: string;
+  status: PurchaseStatus;
+  activationDate?: string | null;
+  firstClaimDate?: string | null;
+  maturityDate?: string | null;
 }
 
 // ---- Purchase / Payment ----
@@ -119,171 +82,137 @@ export type PaymentMethod = 'wallet' | 'direct';
 
 export interface WalletPurchaseRequest {
   packageId: string;
+  idempotencyKey?: string;
 }
 
 export interface DirectPaymentRequest {
   packageId: string;
-  amount: number;
-  paymentReference?: string;
+  amountPaid: string;
+  paymentAccountId: string;
+  paymentMethodId?: string;
+  idempotencyKey?: string;
 }
 
-export interface PaymentAccountInfo {
-  bankName: string;
-  accountName: string;
-  accountNumber: string;
-  instructions?: string;
-}
-
-export interface Purchase {
+export interface PaymentMethodInfo {
   id: string;
-  packageId: string;
-  packageName: string;
-  vipLevel: number;
-  amount: number;
-  paymentMethod: PaymentMethod;
-  status: PurchaseStatus;
-  rejectionReason?: string;
-  createdAt: string;
-  updatedAt: string;
+  name: string;
+  displayName: string;
+  instructions?: string;
+  accounts: PaymentAccount[];
 }
 
-// ---- Transactions ----
-export type TransactionType =
-  | 'registration_bonus'
-  | 'coffee_purchase'
-  | 'daily_income'
-  | 'referral_commission'
-  | 'promo_reward'
-  | 'withdrawal_hold'
-  | 'withdrawal_completed'
-  | 'withdrawal_refund'
-  | 'admin_adjustment'
-  | 'refund';
+export interface PaymentAccount {
+  id: string;
+  accountNumber: string;
+  accountName: string;
+  instructions?: string;
+  displayOrder: number;
+}
 
-export type TransactionStatus = 'pending' | 'completed' | 'failed' | 'reversed';
+// ---- Transactions (from /wallet/transactions) ----
+export type TransactionType =
+  | 'REGISTRATION_BONUS'
+  | 'PURCHASE'
+  | 'DAILY_CLAIM'
+  | 'REFERRAL_COMMISSION'
+  | 'REWARD_CODE'
+  | 'WITHDRAWAL'
+  | 'WITHDRAWAL_REVERSAL'
+  | 'ADMIN_CREDIT'
+  | 'ADMIN_DEBIT';
 
 export interface Transaction {
   id: string;
   type: TransactionType;
-  amount: number;
-  status: TransactionStatus;
+  amount: string;
   description: string;
-  reference?: string;
-  balanceAfter?: number;
   createdAt: string;
 }
 
 export interface TransactionFilters {
-  type?: TransactionType;
-  status?: TransactionStatus;
+  type?: string;
+  startDate?: string;
+  endDate?: string;
   page?: number;
   limit?: number;
 }
 
-// ---- Daily Claims ----
+// ---- Daily Claims (from /claims) ----
 export interface DailyClaim {
   id: string;
-  userPackageId: string;
-  packageName: string;
-  day: number;
-  amount: number;
+  purchaseId: string;
+  day?: number;
+  amount: string;
   claimedAt: string;
+  packageName?: string;
 }
 
-export interface ClaimResult {
-  totalClaimed: number;
-  claims: DailyClaim[];
-  walletBalance: number;
-}
-
-// ---- Referrals ----
+// ---- Referrals (from /referrals) ----
 export interface Referral {
   id: string;
-  referredUserPhone: string;
-  commission: number;
-  packageName: string;
-  status: 'pending' | 'completed';
-  createdAt: string;
+  phone: string;
+  fullName?: string;
+  totalPurchases: number;
+  joinedAt: string;
 }
 
 export interface ReferralInfo {
   referralCode: string;
-  referralLink: string;
-  totalEarnings: number;
-  referralCount: number;
-  referrals: Referral[];
+  referredBy?: { phone: string; fullName?: string } | null;
+  totalReferrals: number;
+  totalCommissionsEarned: string;
+  totalCommissionCount: number;
 }
 
-// ---- Withdrawals ----
-export type WithdrawalStatus = 'pending' | 'processing' | 'completed' | 'rejected';
-
-export type WithdrawalMethod = 'cbe' | 'boa' | 'awash' | 'dashen' | 'cbe_birr';
-
-export interface WithdrawalMethodInfo {
-  id: WithdrawalMethod;
-  name: string;
-  enabled: boolean;
+export interface ReferralCommission {
+  id: string;
+  purchaseAmount: string;
+  commissionRate: string;
+  commissionAmount: string;
+  packageName: string;
+  createdAt: string;
 }
+
+// ---- Withdrawals (from /withdrawals) ----
+export type WithdrawalStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'REJECTED';
 
 export interface WithdrawalRequest {
-  amount: number;
-  method: WithdrawalMethod;
+  amount: string;
+  paymentMethodId: string;
   accountNumber: string;
   accountName: string;
+  idempotencyKey?: string;
 }
 
 export interface WithdrawalFeeCalculation {
-  grossAmount: number;
-  fee: number;
-  netAmount: number;
-  feeDescription?: string;
+  grossAmount: string;
+  feeAmount: string;
+  feeRate: string;
+  netAmount: string;
 }
 
 export interface Withdrawal {
   id: string;
-  amount: number;
-  fee: number;
-  netAmount: number;
-  method: WithdrawalMethod;
-  methodName: string;
-  accountNumber: string;
-  accountName: string;
+  grossAmount: string;
+  feeAmount: string;
+  netAmount: string;
   status: WithdrawalStatus;
-  rejectionReason?: string;
   createdAt: string;
-  processedAt?: string;
 }
 
-// ---- Reward Codes ----
-export interface RewardRedemptionRequest {
-  code: string;
-}
-
+// ---- Reward Codes (from /rewards) ----
 export interface RewardRedemptionResult {
-  rewardAmount: number;
+  amount: string;
   message: string;
-  walletBalance: number;
 }
 
-// ---- Notifications ----
-export type NotificationType =
-  | 'payment_approved'
-  | 'payment_rejected'
-  | 'coffee_activated'
-  | 'daily_income'
-  | 'withdrawal_completed'
-  | 'withdrawal_rejected'
-  | 'referral_commission'
-  | 'reward_received'
-  | 'system_announcement';
-
+// ---- Notifications (from /notifications) ----
 export interface Notification {
   id: string;
-  type: NotificationType;
+  type: string;
   title: string;
   message: string;
-  read: boolean;
-  actionUrl?: string;
+  isRead: boolean;
   createdAt: string;
 }
 
@@ -309,5 +238,4 @@ export interface ApiErrorResponse {
 export interface ChangePasswordRequest {
   currentPassword: string;
   newPassword: string;
-  confirmNewPassword: string;
 }

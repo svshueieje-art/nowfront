@@ -140,16 +140,15 @@ export function truncate(str: string, maxLength: number): string {
  */
 export function getTransactionTypeLabel(type: string): string {
   const labels: Record<string, string> = {
-    registration_bonus: 'Registration Bonus',
-    coffee_purchase: 'Coffee Purchase',
-    daily_income: 'Daily Income',
-    referral_commission: 'Referral Commission',
-    promo_reward: 'Promo Reward',
-    withdrawal_hold: 'Withdrawal Hold',
-    withdrawal_completed: 'Withdrawal',
-    withdrawal_refund: 'Withdrawal Refund',
-    admin_adjustment: 'Adjustment',
-    refund: 'Refund',
+    REGISTRATION_BONUS: 'Registration Bonus',
+    PURCHASE: 'Coffee Purchase',
+    DAILY_CLAIM: 'Daily Income',
+    REFERRAL_COMMISSION: 'Referral Commission',
+    REWARD_CODE: 'Reward Code',
+    WITHDRAWAL: 'Withdrawal',
+    WITHDRAWAL_REVERSAL: 'Withdrawal Reversal',
+    ADMIN_CREDIT: 'Admin Credit',
+    ADMIN_DEBIT: 'Admin Debit',
   };
   return labels[type] ?? type.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
 }
@@ -158,13 +157,16 @@ export function getTransactionTypeLabel(type: string): string {
  * Get status color classes.
  */
 export function getStatusColor(status: string): string {
-  switch (status) {
+  const s = status.toLowerCase();
+  switch (s) {
     case 'active':
     case 'approved':
     case 'completed':
     case 'unlocked':
       return 'text-success-500 bg-success-500/10';
     case 'pending':
+    case 'pending_payment':
+    case 'pending_activation':
     case 'processing':
       return 'text-warning-500 bg-warning-500/10';
     case 'rejected':
@@ -185,13 +187,12 @@ export function getStatusColor(status: string): string {
  */
 export function isPositiveTransaction(type: string): boolean {
   return [
-    'registration_bonus',
-    'daily_income',
-    'referral_commission',
-    'promo_reward',
-    'withdrawal_refund',
-    'admin_adjustment',
-    'refund',
+    'REGISTRATION_BONUS',
+    'DAILY_CLAIM',
+    'REFERRAL_COMMISSION',
+    'REWARD_CODE',
+    'WITHDRAWAL_REVERSAL',
+    'ADMIN_CREDIT',
   ].includes(type);
 }
 
